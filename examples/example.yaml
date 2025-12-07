@@ -1,6 +1,5 @@
 # Example ESPHome configuration for Gree AC
-# Place this component folder in your ESPHome config directory as:
-# esphome/components/gree_ac/
+# Uses the component from the GitHub repository
 
 esphome:
   name: gree-ac
@@ -10,7 +9,9 @@ esp32:
   framework:
     type: arduino
 
-# Local components are adjacent to this YAML (keep `components/` next to this file)
+external_components:
+  - source: github://enishoca/esphome_gree_hvac
+    components: [ gree_ac ]
 
 # Enable logging
 logger:
@@ -19,16 +20,15 @@ logger:
 
 # Enable Home Assistant API
 api:
-  encryption:
-    key: !secret api_encryption_key
+
 
 ota:
   platform: esphome
   password: "your-ota-password"
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
+  ssid: "your-wifi-ssid"
+  password: "your-wifi-password"
   
   # Enable fallback hotspot
   ap:
@@ -49,9 +49,6 @@ uart:
   data_bits: 8
   stop_bits: 1
 
-external_components:
-  - source: components
-
 # Main climate component
 climate:
   - platform: gree_ac
@@ -66,13 +63,6 @@ climate:
       - VERTICAL
       - HORIZONTAL
       - BOTH
-
-    # Optional: Use external temperature sensor instead of AC's sensor
-    # current_temperature_sensor: external_temp_sensor
-    
-    # Optional features like advanced swing, display and switches
-    # were removed from this component to simplify compilation.
-    # Re-add them later via a controlled incremental implementation.
 
 # Optional: External temperature sensor (Dallas DS18B20)
 # one_wire:
@@ -96,4 +86,3 @@ status_led:
   pin:
     number: GPIO2
     inverted: true
-
