@@ -1,0 +1,121 @@
+# Example ESPHome configuration for Gree AC with optional select/switch support
+# This demonstrates how to wire optional components like swing selects and feature switches
+
+esphome:
+  name: gree-ac-full
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+  level: DEBUG
+  baud_rate: 0
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  platform: esphome
+  password: "your-ota-password"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Gree AC Fallback"
+    password: "fallback-password"
+
+uart:
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  baud_rate: 4800
+  parity: EVEN
+  data_bits: 8
+  stop_bits: 1
+
+external_components:
+  - source: components
+
+# Optional select and switch entities for advanced features
+select:
+  - platform: template
+    name: "Horizontal Swing"
+    id: h_swing_select
+    options:
+      - "Left"
+      - "Center"
+      - "Right"
+    initial_option: "Center"
+    optimistic: true
+    restore_value: true
+
+  - platform: template
+    name: "Vertical Swing"
+    id: v_swing_select
+    options:
+      - "Up"
+      - "Center"
+      - "Down"
+    initial_option: "Center"
+    optimistic: true
+    restore_value: true
+
+  - platform: template
+    name: "Display"
+    id: display_select
+    options:
+      - "On"
+      - "Off"
+    initial_option: "On"
+    optimistic: true
+    restore_value: true
+
+switch:
+  - platform: template
+    name: "Plasma"
+    id: plasma_switch
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: template
+    name: "Sleep"
+    id: sleep_switch
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: template
+    name: "X-Fan"
+    id: xfan_switch
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+# Main climate component with optional features wired
+climate:
+  - platform: gree_ac
+    id: my_gree_ac
+    name: "Living Room AC"
+    update_interval: 5s
+    supported_presets:
+      - NONE
+      - BOOST
+    supported_swing_modes:
+      - "OFF"
+      - VERTICAL
+      - HORIZONTAL
+      - BOTH
+    # Wire optional select components (only if present)
+    horizontal_swing_select: h_swing_select
+    vertical_swing_select: v_swing_select
+    display_select: display_select
+    # Wire optional switch components (only if present)
+    plasma_switch: plasma_switch
+    sleep_switch: sleep_switch
+    xfan_switch: xfan_switch
+
+# Monitor WiFi signal
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal"

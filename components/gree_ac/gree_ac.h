@@ -3,11 +3,12 @@
 #include "esphome/core/component.h"
 #include "esphome/components/climate/climate.h"
 #include "esphome/components/uart/uart.h"
-#include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
-#include "esphome/components/switch/switch.h"
+#include <set>
 
 namespace esphome {
+namespace select { class Select; }
+namespace switch_ { class Switch; }
 namespace gree_ac {
 
 static const char *const TAG = "gree_ac";
@@ -28,6 +29,18 @@ static const uint8_t GREE_TX_BUFFER_SIZE = 47;
 // Packet types
 static const uint8_t CMD_IN_UNIT_REPORT = 0x31;
 static const uint8_t CMD_OUT_PARAMS_SET = 0x01;
+
+// Presets (packet values)
+static const uint8_t PRESET_COOL_NORMAL = 6;
+static const uint8_t PRESET_COOL_BOOST = 7;
+static const uint8_t PRESET_HEAT_NORMAL = 14;
+static const uint8_t PRESET_HEAT_BOOST = 15;
+
+// Swing values
+static const uint8_t AC_SWING_OFF = 0x44;
+static const uint8_t AC_SWING_VERTICAL = 0x14;
+static const uint8_t AC_SWING_HORIZONTAL = 0x41;
+static const uint8_t AC_SWING_BOTH = 0x11;
 
 // Timing constants
 static const uint32_t HANDSHAKE_RETRY_INTERVAL_MS = 5000;  // Retry handshake every 5 seconds
@@ -56,10 +69,10 @@ enum class ACMode : uint8_t {
 
 // Fan speeds
 enum class ACFanSpeed : uint8_t {
-  AUTO = 0x00,
-  LOW = 0x01,
-  MEDIUM = 0x02,
-  HIGH = 0x03
+  S_AUTO = 0x00,
+  S_LOW = 0x01,
+  S_MEDIUM = 0x02,
+  S_HIGH = 0x03
 };
 
 // Component states
@@ -96,14 +109,9 @@ struct gree_raw_packet_t {
   uint8_t data[1];
 };
 
-// Custom switch class
-class GreeACSwitch : public switch_::Switch, public Component {
- protected:
-  void write_state(bool state) override { this->publish_state(state); }
-};
-
-// Custom select class
-class GreeACSelect : public select::Select, public Component {};
+// Note: custom select/switch helper classes removed to avoid build-time
+// dependency on those components. Optional selects/switches remain as
+// pointer members and can be assigned if available at runtime.
 
 // Main climate component
 class GreeAC : public PollingComponent, public uart::UARTDevice, public climate::Climate {
@@ -128,6 +136,9 @@ class GreeAC : public PollingComponent, public uart::UARTDevice, public climate:
   void set_supported_presets(const std::set<climate::ClimatePreset> &presets) {
     this->supported_presets_ = presets;
   }
+  void set_supported_swing_modes(const std::set<climate::ClimateSwingMode> &modes) {
+    this->supported_swing_modes_ = modes;
+  }
 
  protected:
   // Communication
@@ -139,7 +150,7 @@ class GreeAC : public PollingComponent, public uart::UARTDevice, public climate:
   void log_packet_(const uint8_t *data, uint8_t size, bool outgoing = false);
 
   // State parsing
-  void parse_state_packet_(const uint8_t *data);
+  void parse_state_packet_(const uint8_t *data, uint8_t size);
   climate::ClimateMode parse_mode_(uint8_t mode_byte);
   const char *parse_fan_mode_(uint8_t mode_byte);
   climate::ClimatePreset parse_preset_(uint8_t preset_byte, ACMode mode);
@@ -181,6 +192,13 @@ class GreeAC : public PollingComponent, public uart::UARTDevice, public climate:
   uint8_t rx_index_ = 0;
   bool receiving_packet_ = false;
 
+  // Diagnostics / statistics
+  uint32_t packets_received_ = 0;
+  uint32_t packets_sent_ = 0;
+  uint32_t checksum_errors_ = 0;
+  uint32_t timeout_errors_ = 0;
+  uint32_t invalid_packet_errors_ = 0;
+
   // Internal state tracking
   ACMode mode_internal_ = ACMode::OFF;
   bool power_internal_ = false;
@@ -202,6 +220,7 @@ class GreeAC : public PollingComponent, public uart::UARTDevice, public climate:
 
   // Supported features
   std::set<climate::ClimatePreset> supported_presets_{};
+  std::set<climate::ClimateSwingMode> supported_swing_modes_{};
 };
 
 }  // namespace gree_ac

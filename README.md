@@ -4,15 +4,15 @@ A modern, feature-rich ESPHome component for Gree/Sinclair air conditioners with
 
 ## Features
 
-✅ **Full climate control** - Temperature, mode, fan speed, swing
-✅ **Handshake retry** - Automatically retries connection if AC is unresponsive
-✅ **Advanced swing control** - Separate horizontal and vertical position control
-✅ **Extra features** - Plasma/Health, Sleep, X-Fan modes
-✅ **Display control** - Turn AC display on/off
-✅ **External sensor support** - Override AC's temperature sensor
-✅ **Preset support** - Turbo/Boost mode
-✅ **Modern ESPHome** - Compatible with latest ESPHome versions
-✅ **Robust protocol** - Proper packet validation and checksums
+- ✅ **Full climate control** — Temperature, mode, fan speed, swing
+- ✅ **Handshake retry** — Automatically retries connection if AC is unresponsive
+- ✅ **Advanced swing control** — Separate horizontal and vertical position control
+- ✅ **Extra features** — Plasma/Health, Sleep, X-Fan modes
+- ✅ **Display control** — Turn AC display on/off
+- ✅ **External sensor support** — Override AC's temperature sensor
+- ✅ **Preset support** — Turbo/Boost mode
+- ✅ **Modern ESPHome** — Compatible with latest ESPHome versions
+- ✅ **Robust protocol** — Proper packet validation and checksums
 
 ## Supported Models
 
@@ -299,7 +299,42 @@ gree_ac/
 
 ### Testing
 
-Enable verbose logging:
+#### Unit Tests
+
+The component includes comprehensive unit tests for protocol logic validation. These tests verify:
+- Checksum calculation
+- Temperature parsing (incoming/outgoing formulas)
+- Mode and fan speed encoding/decoding
+- Preset selection
+- Swing mode mapping
+- Packet structure validation
+- DRY mode fan enforcement
+- Indoor temperature parsing
+
+**Run the unit tests:**
+
+```bash
+python3 tests/test_gree_ac_protocol.py
+```
+
+**Expected output:**
+```
+=== Gree AC Component Unit Tests ===
+
+Test 1: Checksum Calculation
+  ✓ Checksum calculation passed
+
+Test 2: Temperature Parsing (Incoming)
+  ✓ Temperature parsing passed
+
+...
+
+=== All tests passed! ===
+```
+
+#### Runtime Testing with ESPHome
+
+Enable verbose logging in your config to see all UART communication:
 
 ```yaml
 logger:
