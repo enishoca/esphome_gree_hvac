@@ -1,0 +1,208 @@
+#pragma once
+
+#include "esphome/core/component.h"
+#include "esphome/components/climate/climate.h"
+#include "esphome/components/uart/uart.h"
+#include "esphome/components/select/select.h"
+#include "esphome/components/sensor/sensor.h"
+#include "esphome/components/switch/switch.h"
+
+namespace esphome {
+namespace gree_ac {
+
+static const char *const TAG = "gree_ac";
+static const char *const VERSION = "1.0.0";
+
+// Temperature constants
+static const uint8_t MIN_TEMPERATURE = 16;
+static const uint8_t MAX_TEMPERATURE = 30;
+static const float TEMPERATURE_STEP = 1.0;
+static const float TEMPERATURE_TOLERANCE = 2.0;
+static const uint8_t TEMPERATURE_THRESHOLD = 100;
+
+// Protocol constants
+static const uint8_t GREE_START_BYTE = 0x7E;
+static const uint8_t GREE_RX_BUFFER_SIZE = 52;
+static const uint8_t GREE_TX_BUFFER_SIZE = 47;
+
+// Packet types
+static const uint8_t CMD_IN_UNIT_REPORT = 0x31;
+static const uint8_t CMD_OUT_PARAMS_SET = 0x01;
+
+// Timing constants
+static const uint32_t HANDSHAKE_RETRY_INTERVAL_MS = 5000;  // Retry handshake every 5 seconds
+static const uint32_t PACKET_TIMEOUT_MS = 1000;            // Consider AC inactive after 1 second
+static const uint32_t MIN_PACKET_INTERVAL_MS = 300;        // Minimum time between packets
+
+// Fan modes
+namespace fan_modes {
+const char *const FAN_AUTO = "Auto";
+const char *const FAN_QUIET = "Quiet";
+const char *const FAN_LOW = "Low";
+const char *const FAN_MEDIUM = "Medium";
+const char *const FAN_HIGH = "High";
+const char *const FAN_TURBO = "Turbo";
+}  // namespace fan_modes
+
+// AC Modes
+enum class ACMode : uint8_t {
+  OFF = 0x10,
+  AUTO = 0x80,
+  COOL = 0x90,
+  DRY = 0xA0,
+  FAN_ONLY = 0xB0,
+  HEAT = 0xC0
+};
+
+// Fan speeds
+enum class ACFanSpeed : uint8_t {
+  AUTO = 0x00,
+  LOW = 0x01,
+  MEDIUM = 0x02,
+  HIGH = 0x03
+};
+
+// Component states
+enum class ACState {
+  INITIALIZING,  // Waiting for communication
+  READY          // AC is responsive
+};
+
+// Update states
+enum class UpdateState {
+  NO_UPDATE,     // No changes pending
+  UPDATE_PENDING // Changes need to be sent
+};
+
+// Serial processing states
+enum class SerialState {
+  WAIT_SYNC,
+  RECEIVE,
+  COMPLETE
+};
+
+// Packet structures
+union gree_start_bytes_t {
+  uint8_t u8x2[2];
+};
+
+struct gree_header_t {
+  gree_start_bytes_t start_bytes;
+  uint8_t data_length;
+};
+
+struct gree_raw_packet_t {
+  gree_header_t header;
+  uint8_t data[1];
+};
+
+// Custom switch class
+class GreeACSwitch : public switch_::Switch, public Component {
+ protected:
+  void write_state(bool state) override { this->publish_state(state); }
+};
+
+// Custom select class
+class GreeACSelect : public select::Select, public Component {};
+
+// Main climate component
+class GreeAC : public PollingComponent, public uart::UARTDevice, public climate::Climate {
+ public:
+  void setup() override;
+  void loop() override;
+  void update() override;
+  void dump_config() override;
+
+  // Climate control
+  void control(const climate::ClimateCall &call) override;
+  climate::ClimateTraits traits() override;
+
+  // Setters for optional components
+  void set_horizontal_swing_select(select::Select *select) { this->horizontal_swing_select_ = select; }
+  void set_vertical_swing_select(select::Select *select) { this->vertical_swing_select_ = select; }
+  void set_display_select(select::Select *select) { this->display_select_ = select; }
+  void set_plasma_switch(switch_::Switch *sw) { this->plasma_switch_ = sw; }
+  void set_sleep_switch(switch_::Switch *sw) { this->sleep_switch_ = sw; }
+  void set_xfan_switch(switch_::Switch *sw) { this->xfan_switch_ = sw; }
+  void set_current_temperature_sensor(sensor::Sensor *sensor) { this->current_temperature_sensor_ = sensor; }
+  void set_supported_presets(const std::set<climate::ClimatePreset> &presets) {
+    this->supported_presets_ = presets;
+  }
+
+ protected:
+  // Communication
+  void read_uart_data_();
+  void send_packet_();
+  bool verify_packet_(const uint8_t *data, uint8_t size);
+  void handle_packet_(const uint8_t *data, uint8_t size);
+  uint8_t calculate_checksum_(const uint8_t *data, size_t size);
+  void log_packet_(const uint8_t *data, uint8_t size, bool outgoing = false);
+
+  // State parsing
+  void parse_state_packet_(const uint8_t *data);
+  climate::ClimateMode parse_mode_(uint8_t mode_byte);
+  const char *parse_fan_mode_(uint8_t mode_byte);
+  climate::ClimatePreset parse_preset_(uint8_t preset_byte, ACMode mode);
+
+  // Packet building
+  void build_state_packet_();
+
+  // Optional component callbacks
+  void setup_select_callbacks_();
+  void setup_switch_callbacks_();
+  void on_horizontal_swing_change_(const std::string &value);
+  void on_vertical_swing_change_(const std::string &value);
+  void on_display_change_(const std::string &value);
+  void on_plasma_change_(bool state);
+  void on_sleep_change_(bool state);
+  void on_xfan_change_(bool state);
+
+  // Update helpers
+  void update_swing_states_();
+  climate::ClimateAction determine_action_();
+
+  // State variables
+  ACState state_ = ACState::INITIALIZING;
+  UpdateState update_state_ = UpdateState::NO_UPDATE;
+  SerialState serial_state_ = SerialState::WAIT_SYNC;
+
+  // Timing
+  uint32_t last_packet_sent_ = 0;
+  uint32_t last_packet_received_ = 0;
+  uint32_t last_handshake_attempt_ = 0;
+
+  // Buffers
+  uint8_t tx_buffer_[GREE_TX_BUFFER_SIZE] = {
+      0x7E, 0x7E, 0x2C, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x02,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  uint8_t rx_buffer_[GREE_RX_BUFFER_SIZE] = {0};
+  uint8_t rx_index_ = 0;
+  bool receiving_packet_ = false;
+
+  // Internal state tracking
+  ACMode mode_internal_ = ACMode::OFF;
+  bool power_internal_ = false;
+  std::string horizontal_swing_state_ = "Center";
+  std::string vertical_swing_state_ = "Center";
+  std::string display_state_ = "On";
+  bool plasma_state_ = false;
+  bool sleep_state_ = false;
+  bool xfan_state_ = false;
+
+  // Optional components
+  select::Select *horizontal_swing_select_ = nullptr;
+  select::Select *vertical_swing_select_ = nullptr;
+  select::Select *display_select_ = nullptr;
+  switch_::Switch *plasma_switch_ = nullptr;
+  switch_::Switch *sleep_switch_ = nullptr;
+  switch_::Switch *xfan_switch_ = nullptr;
+  sensor::Sensor *current_temperature_sensor_ = nullptr;
+
+  // Supported features
+  std::set<climate::ClimatePreset> supported_presets_{};
+};
+
+}  // namespace gree_ac
+}  // namespace esphome
