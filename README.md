@@ -350,6 +350,8 @@ Contributions are welcome! If you have a different AC model or find issues:
 2. Capture packet traces
 3. Open an issue with model info and logs
 
+For detailed information about contributing, including GitHub Copilot AI assistance options for developers, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Credits
 
 Based on the excellent work of:
